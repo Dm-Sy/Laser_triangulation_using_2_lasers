@@ -1,1 +1,23 @@
+version: "3.3"
+services:
+  ros-humble:
+    build: .
+    container_name: ros-humble
+    volumes:
+      - ./ros2_ws:/root/ros2_ws 
+      - ./DEFAULT_FASTRTPS_PROFILES.xml:/root/fastdds_profiles.xml
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - ~/ssh:/root/.ssh  
+    environment:
+      - DISPLAY=${DISPLAY} 
+      - RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+      - FASTRTPS_DEFAULT_PROFILES_FILE=/root/fastdds_profiles.xml
+      - CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface name="wlp0s20f3"/><NetworkInterface name="enp7s0f1"/></Interfaces></General></Domain></CycloneDDS>
+    network_mode: "host"
+    privileged: true  
+    stdin_open: true
+    tty: true
+    devices:                      # <---docker permission to access laptop camera
+      - /dev/video0:/dev/video0   # <---docker permission to access laptop camera
+
 
