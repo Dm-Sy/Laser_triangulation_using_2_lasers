@@ -1,0 +1,25 @@
+laser_perception_node:
+  ros__parameters:
+    # Prvi raspon crvene (HSV)
+    h_min_1: 0
+    s_min_1: 60
+    v_min_1: 100
+    h_max_1: 40
+    s_max_1: 255
+    v_max_1: 255
+
+    # Drugi raspon crvene (HSV)
+    h_min_2: 140
+    s_min_2: 60
+    v_min_2: 100
+    h_max_2: 180
+    s_max_2: 255
+    v_max_2: 255
+
+    # Površina kontura
+    min_area: 1.0
+    max_area: 3000.0
+
+    # Geometrijski uvjeti uparivanja
+    max_y_diff: 150
+    min_x_diff: 10
