@@ -10,11 +10,12 @@ class LaserKinematicsNode(Node):
         super().__init__('laser_kinematics_node')
 
         # --- KONFIGURACIJA KAMERE I LASERA ---
-        self.B_METERS = 0.205  # Udaljenost između lasera
-
+        # Udaljenost između lasera
+        self.B_METERS = 0.205  
+        # Kalibrirane fizičke udaljenosti (u metrima) lasera od optičkog centra kamere
         self.declare_parameter('x_left', -0.1462)
         self.declare_parameter('x_right', 0.0588)
-        
+        # Matrica kamere
         self.CAM_MATRIX = np.array([
             [1101.064731353069, 0.000000, 903.5475221887251],
             [0.000000, 1102.243517934071, 526.5995712488191],
@@ -27,12 +28,12 @@ class LaserKinematicsNode(Node):
         self.fx = self.CAM_MATRIX[0, 0]
         self.cx = self.CAM_MATRIX[0, 2]
 
-        # --- PUBLISHERS ---
-        # 1. Stvarna, najkraća okomita udaljenost do zida
+        # --- PUBLISHERI I PRETPALTE ---
+        # Stvarna, najkraća okomita udaljenost do zida
         self.perp_dist_pub = self.create_publisher(Float64, '/robot/wall_distance_perpendicular', 10)
-        # 2. Udaljenost do točke promatranja (po osi kamere)
+        # Udaljenost do točke promatranja (po osi kamere)
         self.obs_dist_pub = self.create_publisher(Float64, '/robot/wall_distance_observed', 10)
-        # 3. Kut zakreta
+        # Kut zakreta
         self.yaw_pub = self.create_publisher(Float64, '/robot/wall_yaw_angle', 10)
         
         self.points_sub = self.create_subscription(Float64MultiArray, '/laser_points', self.points_callback, 10)
@@ -49,22 +50,21 @@ class LaserKinematicsNode(Node):
             [[msg.data[2], msg.data[3]]]
         ], dtype=np.float32)
 
-        # Uklanjanje distorzije objektiva
+        # Uklanjanje distorzije
         pts_undistorted = cv2.undistortPoints(pts_distorted, self.CAM_MATRIX, self.DIST_COEFFS, P=self.CAM_MATRIX)
         
         u_left = pts_undistorted[0, 0, 0]
         u_right = pts_undistorted[1, 0, 0]
 
-        # Provjera kako bismo izbjegli dijeljenje s nulom (ako je točka točno u centru, što je nemoguće za ovaj setup)
+        # Provjera kako bi se izbjeglo dijeljenje s nulom (ako je točka točno u centru)
         if (u_left - self.cx) == 0 or (u_right - self.cx) == 0:
             return
 
         # Računanje pojedinačnih dubina za svaku lasersku zraku
-        # Pretpostavka: laseri su simetrično razmaknuti za B/2 u odnosu na objektiv kamere
+        # Pretpostavka da su laseri simetrično razmaknuti za B/2 u odnosu na objektiv kamere
         # X_left = -self.B_METERS / 2.0
         # X_right = self.B_METERS / 2.0
-
-        # Kalibrirane fizičke udaljenosti lasera od optičkog centra kamere
+        
         X_left = self.get_parameter('x_left').value
         X_right = self.get_parameter('x_right').value
 
@@ -76,12 +76,12 @@ class LaserKinematicsNode(Node):
             return
 
         # Računanje kuta (yaw)
-        # Ako je lijevi Z veći od desnog, to znači da je lijevi dio zida dalje (robot je okrenut ulijevo)
+        # Ako je lijevi Z > desni Z, to znači da je robot je okrenut ulijevo
         dz = Z_right - Z_left
         yaw_rad = math.atan2(dz, self.B_METERS)
         yaw_deg = math.degrees(yaw_rad)
 
-        # Udaljenost do točke promatranja (po osi zračenja kamere)
+        # Udaljenost do točke promatranja (po osi kamere)
         Z_observed = (Z_left + Z_right) / 2.0
 
         # Stvarna, najkraća okomita udaljenost do ravnine zida
@@ -92,7 +92,7 @@ class LaserKinematicsNode(Node):
         self.perp_dist_pub.publish(Float64(data=Z_perpendicular))
         self.yaw_pub.publish(Float64(data=yaw_deg))
 
-        # (Opcionalno) Ispis u terminal
+        # Ispis dobivenih vrijednosti u terminal
         self.get_logger().info(f"Obs Dist: {Z_observed:.3f}m | Perp Dist: {Z_perpendicular:.3f}m | Yaw: {yaw_deg:.2f}°")
 
 def main(args=None):
