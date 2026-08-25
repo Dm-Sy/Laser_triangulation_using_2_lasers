@@ -61,7 +61,7 @@ class LaserPerceptionNode(Node):
         mask = cv2.bitwise_or(mask1, mask2)
         
         # Čišćenje šuma
-        kernel = np.ones((5, 5), np.uint8) # Sve što je manje od 5x5 piksela bit će očišćeno
+        kernel = np.ones((5, 5), np.uint8) # Sve što je manje/jednako od 5x5 piksela bit će očišćeno
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         
