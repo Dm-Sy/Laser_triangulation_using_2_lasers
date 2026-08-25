@@ -11,7 +11,7 @@ class LaserPerceptionNode(Node):
         super().__init__('laser_perception_node')
 
         # --- PARAMETRI ZA CRVENU BOJU (HSV) ---
-        # Crvena boja prelazi preko granice 180 u HSV-u, pa trebamo dva raspona
+        # Crvena boja prelazi preko granice 0 u HSV-u, pa trebamo dva raspona
         self.declare_parameter('h_min_1', 0)
         self.declare_parameter('s_min_1', 100)
         self.declare_parameter('v_min_1', 100)
@@ -25,18 +25,18 @@ class LaserPerceptionNode(Node):
         self.declare_parameter('h_max_2', 180)
         self.declare_parameter('s_max_2', 255)
         self.declare_parameter('v_max_2', 255)
-
+        # Minimalna i maksimalna površina točke (pikseli)
         self.declare_parameter('min_area', 0.5)
         self.declare_parameter('max_area', 10000.0)
-
+        # Minimalni razmak po X i maksimalni razmak po Y (pikseli)
         self.declare_parameter('max_y_diff', 150)
         self.declare_parameter('min_x_diff', 10)
 
         self.bridge = CvBridge()
 
-        self.cx = 891  # Optički centar iz matrice
+        self.cx = 891  # Optički centar očitan iz matrice kamere
         
-        # --- PUBLISHERS & SUBSCRIBERS ---
+        # --- PUBLISHERI & PRETPLATE ---
         self.points_pub = self.create_publisher(Float64MultiArray, '/laser_points', 10)
         self.debug_pub = self.create_publisher(Image, '/laser_perception/debug_image', 10)
         self.mask_pub = self.create_publisher(Image, '/laser_perception/debug_mask', 10)
@@ -61,7 +61,7 @@ class LaserPerceptionNode(Node):
         mask = cv2.bitwise_or(mask1, mask2)
         
         # Čišćenje šuma
-        kernel = np.ones((5, 5), np.uint8)
+        kernel = np.ones((5, 5), np.uint8) # Sve što je manje od 5x5 piksela bit će očišćeno
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         
@@ -70,7 +70,7 @@ class LaserPerceptionNode(Node):
         candidates = []
         min_area = self.get_parameter('min_area').value
         max_area = self.get_parameter('max_area').value
-
+        # Vračanje kandidata koji zadovoljavaju kriterije
         for c in contours:
             area = cv2.contourArea(c)
             if min_area < area < max_area: 
@@ -98,7 +98,7 @@ class LaserPerceptionNode(Node):
                 max_y = self.get_parameter('max_y_diff').value
                 min_x = self.get_parameter('min_x_diff').value
                 
-                # Budući da su laseri na istom vodoravnom pravcu, y_diff mora biti mali
+                # Budući da su laseri na otprilike istom vodoravnom pravcu, y_diff mora biti relativno mali
                 if y_diff < max_y and x_diff > min_x:
                     score = y_diff 
                     area1, area2 = p1[2], p2[2]
@@ -109,7 +109,7 @@ class LaserPerceptionNode(Node):
                     
                     if score < best_score:
                         best_score = score
-                        # Sortiramo ih tako da je prvi uvijek lijevi laser, drugi desni
+                        # Sortiramo tako da je prvi uvijek lijevi laser, drugi desni
                         if p1[0] < p2[0]:
                             best_pair = (p1, p2)
                         else:
@@ -119,7 +119,7 @@ class LaserPerceptionNode(Node):
     
     def image_callback(self, msg):
         try:
-            # Umjesto cv_bridge, koristimo numpy i OpenCV za izravno dekodiranje
+            # Umjesto cv_bridge, koristi se numpy i OpenCV za izravno dekodiranje
             np_arr = np.frombuffer(msg.data, np.uint8)
             cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             
@@ -141,12 +141,12 @@ class LaserPerceptionNode(Node):
         if pair:
             p_left, p_right = pair
 
-            # OPTIČKI CENTAR
+            # Prikazivanje optičkog centra
             height = debug_image.shape[0]
             cv2.line(debug_image, (self.cx, 0), (self.cx, height), (0, 0, 255), 2)
             cv2.putText(debug_image, "OS KAMERE", (self.cx + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
             
-            # Crtanje kontura i središta za debug
+            # Crtanje kontura i središta kružnica za debug
             cv2.drawContours(debug_image, [p_left[3]], -1, (0, 255, 0), 2)
             cv2.drawContours(debug_image, [p_right[3]], -1, (0, 255, 0), 2)
             cv2.circle(debug_image, (p_left[0], p_left[1]), 4, (255, 0, 0), -1)
