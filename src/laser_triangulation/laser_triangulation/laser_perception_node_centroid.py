@@ -11,7 +11,7 @@ class LaserPerceptionNodeSimulation(Node):
         super().__init__('laser_perception_node_simulation')
 
         # --- PARAMETRI ZA CRVENU BOJU (HSV) ---
-        # Crvena boja prelazi preko granice 180 u HSV-u, pa trebamo dva raspona
+        # Crvena boja prelazi preko granice 0 u HSV-u, pa trebamo dva raspona
         self.declare_parameter('h_min_1', 0)
         self.declare_parameter('s_min_1', 85)
         self.declare_parameter('v_min_1', 100)
@@ -25,18 +25,18 @@ class LaserPerceptionNodeSimulation(Node):
         self.declare_parameter('h_max_2', 180)
         self.declare_parameter('s_max_2', 255)
         self.declare_parameter('v_max_2', 255)
-
+        # Minimalna i maksimalna površina točke (pikseli)
         self.declare_parameter('min_area', 0.3)
         self.declare_parameter('max_area', 10000.0)
-
+        # Minimalni razmak po X i maksimalni razmak po Y (pikseli)
         self.declare_parameter('max_y_diff', 150)
         self.declare_parameter('min_x_diff', 10)
 
         self.bridge = CvBridge()
 
-        self.cx = 960  # Optički centar iz matrice
+        self.cx = 960  # Optički centar očitan iz matrice kamere
         
-        # --- PUBLISHERS & SUBSCRIBERS ---
+        # --- PUBLISHERI & PRETPLATE ---
         self.points_pub = self.create_publisher(Float64MultiArray, '/laser_points', 10)
         self.debug_pub = self.create_publisher(Image, '/laser_perception/debug_image', 10)
         self.mask_pub = self.create_publisher(Image, '/laser_perception/debug_mask', 10)
@@ -46,18 +46,21 @@ class LaserPerceptionNodeSimulation(Node):
         self.get_logger().info('Laser Perception Node pokrenut. Tražim crvene konture...')
 
     def find_laser_candidates(self, hsv_image):
-        # Dohvaćanje parametara za raspon crvene...
+        # Dohvaćanje parametara za prvi raspon crvene
         lower_red_1 = np.array([self.get_parameter('h_min_1').value, self.get_parameter('s_min_1').value, self.get_parameter('v_min_1').value])
         upper_red_1 = np.array([self.get_parameter('h_max_1').value, self.get_parameter('s_max_1').value, self.get_parameter('v_max_1').value])
+        # Dohvaćanje parametara za drugi raspon crvene
         lower_red_2 = np.array([self.get_parameter('h_min_2').value, self.get_parameter('s_min_2').value, self.get_parameter('v_min_2').value])
         upper_red_2 = np.array([self.get_parameter('h_max_2').value, self.get_parameter('s_max_2').value, self.get_parameter('v_max_2').value])
         
         mask1 = cv2.inRange(hsv_image, lower_red_1, upper_red_1)
         mask2 = cv2.inRange(hsv_image, lower_red_2, upper_red_2)
+        
+        # Spajanje maski
         mask = cv2.bitwise_or(mask1, mask2)
         
         # Čišćenje šuma
-        kernel = np.ones((5, 5), np.uint8)
+        kernel = np.ones((5, 5), np.uint8) # Sve što je manje/jednako od 5x5 piksela bit će očišćeno
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         
@@ -69,25 +72,25 @@ class LaserPerceptionNodeSimulation(Node):
         candidates = []
         min_area = self.get_parameter('min_area').value
         max_area = self.get_parameter('max_area').value
-
+        # Vračanje kandidata koji zadovoljavaju kriterije
         for c in contours:
             area = cv2.contourArea(c)
             if min_area < area < max_area: 
-                # 1. Pronađi okvir (Bounding Box) oko konture radi bržeg računanja
+                # Pronalaženje okvira (Bounding Box) oko konture radi bržeg računanja
                 x, y, w, h = cv2.boundingRect(c)
                 
-                # 2. Izdvoji dio slike sa svjetlinom (V kanal) samo za taj okvir
+                # Izdvajanje dijela slike sa svjetlinom (V kanal) samo za taj okvir
                 roi_v = v_channel[y:y+h, x:x+w]
                 
-                # 3. Napravi lokalnu masku samo za tu konturu kako ne bismo zahvatili okolni šum
+                # Stvaranje lokalnu masku samo za tu konturu kako se ne bi zahvatio okolni šum
                 roi_mask = np.zeros((h, w), dtype=np.uint8)
                 shifted_contour = c - [x, y]
                 cv2.drawContours(roi_mask, [shifted_contour], -1, 255, -1)
                 
-                # 4. Primijeni masku na V kanal kako bismo dobili težine samo za laser
+                # Primijena maske na V kanal kako bi se dobile težine samo za laser
                 roi_weighted = cv2.bitwise_and(roi_v, roi_v, mask=roi_mask)
                 
-                # 5. Izračunaj momente (težište) na temelju INTENZITETA slike
+                # Izračun momenata (težište) na temelju intenziteta slike
                 M = cv2.moments(roi_weighted)
                 
                 if M["m00"] > 0:
@@ -95,7 +98,7 @@ class LaserPerceptionNodeSimulation(Node):
                     cx = (M["m10"] / M["m00"]) + x
                     cy = (M["m01"] / M["m00"]) + y
                     
-                    # Sada candidates sadrži (float, float, float, array)
+                    # Candidates sadrži (float, float, float, array)
                     candidates.append((cx, cy, area, c))
                     
         return candidates, mask
@@ -116,7 +119,7 @@ class LaserPerceptionNodeSimulation(Node):
                 max_y = self.get_parameter('max_y_diff').value
                 min_x = self.get_parameter('min_x_diff').value
                 
-                # Budući da su laseri na istom vodoravnom pravcu, y_diff mora biti mali
+                # Budući da su laseri na otprilike istom vodoravnom pravcu, y_diff mora biti relativno mali
                 if y_diff < max_y and x_diff > min_x:
                     score = y_diff 
                     area1, area2 = p1[2], p2[2]
@@ -127,7 +130,7 @@ class LaserPerceptionNodeSimulation(Node):
                     
                     if score < best_score:
                         best_score = score
-                        # Sortiramo ih tako da je prvi uvijek lijevi laser, drugi desni
+                        # Sortiramo tako da je prvi uvijek lijevi laser, drugi desni
                         if p1[0] < p2[0]:
                             best_pair = (p1, p2)
                         else:
@@ -137,7 +140,7 @@ class LaserPerceptionNodeSimulation(Node):
     
     def image_callback(self, msg):
         try:
-            # S obzirom da primamo 'Image', koristimo CvBridge za jednostavnu konverziju
+            # Kako se prima 'Image', umjesto 'CompressedImage', koristi se CvBridge za konverziju
             cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
             
         except Exception as e:
@@ -154,14 +157,15 @@ class LaserPerceptionNodeSimulation(Node):
         if pair:
             p_left, p_right = pair
 
-            # OPTIČKI CENTAR
+            # Prikazivanje optičkog centra
             height = debug_image.shape[0]
-            # Pod pretpostavkom da si dodao dinamički cx (ili koristi self.cx)
+            # Može se dodati dinamički cx ili koristi self.cx
             trenutni_cx = int(debug_image.shape[1] / 2)
+            # trenutni_cx = int(self.cx)
             cv2.line(debug_image, (trenutni_cx, 0), (trenutni_cx, height), (0, 0, 255), 2)
             cv2.putText(debug_image, "OS KAMERE", (trenutni_cx + 10, 30), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
             
-            # Pretvaranje decimalnih koordinata u cijele brojeve samo za crtanje
+            # Pretvaranje decimalnih koordinata u cijele brojeve za crtanje
             cx_left_int, cy_left_int = int(round(p_left[0])), int(round(p_left[1]))
             cx_right_int, cy_right_int = int(round(p_right[0])), int(round(p_right[1]))
             
@@ -169,13 +173,13 @@ class LaserPerceptionNodeSimulation(Node):
             cv2.drawContours(debug_image, [p_left[3]], -1, (0, 255, 0), 2)
             cv2.drawContours(debug_image, [p_right[3]], -1, (0, 255, 0), 2)
             
-            # Korištenje castanih (int) vrijednosti za crtanje na slici
+            # Korištenje int vrijednosti za crtanje na slici
             cv2.circle(debug_image, (cx_left_int, cy_left_int), 4, (255, 0, 0), -1)
             cv2.circle(debug_image, (cx_right_int, cy_right_int), 4, (255, 0, 0), -1)
             cv2.putText(debug_image, "L", (cx_left_int-20, cy_left_int-20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
             cv2.putText(debug_image, "R", (cx_right_int-20, cy_right_int-20), cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 0, 0), 2)
 
-            # Slanje koordinata - Ovdje šaljemo one prave, čiste decimale (float) u kinematiku!
+            # Slanje float koordinata u kinematiku
             points_msg = Float64MultiArray()
             points_msg.data = [float(p_left[0]), float(p_left[1]), float(p_right[0]), float(p_right[1])]
             self.points_pub.publish(points_msg)
