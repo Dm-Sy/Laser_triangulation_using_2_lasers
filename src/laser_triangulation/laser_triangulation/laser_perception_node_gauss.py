@@ -119,7 +119,7 @@ class LaserPerceptionNodeGauss(Node):
                     cy = float(yo_fitted + y)
                     
                 except RuntimeError:
-                    # SIGURNOSNA MREŽA: ako algoritam ne može uklopiti krivulju (npr. previše šuma),
+                    # Fallback: ako algoritam ne može uklopiti krivulju (npr. previše šuma),
                     # vraća se na originalni način (cv2.moments)
                     M = cv2.moments(c)
                     if M["m00"] > 0:
