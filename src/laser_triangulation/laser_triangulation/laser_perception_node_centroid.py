@@ -130,7 +130,7 @@ class LaserPerceptionNodeSimulation(Node):
                     
                     if score < best_score:
                         best_score = score
-                        # Sortiramo tako da je prvi uvijek lijevi laser, drugi desni
+                        # Sortira tako da je prvi uvijek lijevi laser, drugi desni
                         if p1[0] < p2[0]:
                             best_pair = (p1, p2)
                         else:
