@@ -119,7 +119,7 @@ class LaserPerceptionNode(Node):
     
     def image_callback(self, msg):
         try:
-            # Umjesto cv_bridge, koristi se numpy i OpenCV za izravno dekodiranje
+            # Umjesto cv_bridge, koristi se numpy i OpenCV za izravno dekodiranje (jer je format 'CompressedImage')
             np_arr = np.frombuffer(msg.data, np.uint8)
             cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
             
