@@ -10,11 +10,12 @@ class LaserKinematicsNodeSimulation(Node):
         super().__init__('laser_kinematics_node_simulation')
 
         # --- KONFIGURACIJA KAMERE I LASERA ---
-        self.B_METERS = 0.5  # Udaljenost između lasera
-
+        # Udaljenost između lasera
+        self.B_METERS = 0.5  
+        # Kalibrirane fizičke udaljenosti (u metrima) lasera od optičkog centra kamere (u simulaciji su simetrične)
         self.declare_parameter('x_left', -0.1462)
         self.declare_parameter('x_right', 0.0588)
-        
+        # Matrica kamere
         self.CAM_MATRIX = np.array([
             [935.3, 0.0, 960.0],
             [0.0, 935.3, 540.0],
@@ -27,7 +28,7 @@ class LaserKinematicsNodeSimulation(Node):
         self.fx = self.CAM_MATRIX[0, 0]
         self.cx = self.CAM_MATRIX[0, 2]
 
-        # --- PUBLISHERS ---
+        # --- PUBLISHERI I PRETPLATE ---
         # 1. Stvarna, najkraća okomita udaljenost do zida
         self.perp_dist_pub = self.create_publisher(Float64, '/robot/wall_distance_perpendicular', 10)
         # 2. Udaljenost do točke promatranja (po osi kamere)
@@ -49,13 +50,13 @@ class LaserKinematicsNodeSimulation(Node):
             [[msg.data[2], msg.data[3]]]
         ], dtype=np.float32)
 
-        # Uklanjanje distorzije objektiva
+        # Uklanjanje distorzije 
         pts_undistorted = cv2.undistortPoints(pts_distorted, self.CAM_MATRIX, self.DIST_COEFFS, P=self.CAM_MATRIX)
         
         u_left = pts_undistorted[0, 0, 0]
         u_right = pts_undistorted[1, 0, 0]
 
-        # Provjera kako bismo izbjegli dijeljenje s nulom (ako je točka točno u centru, što je nemoguće za ovaj setup)
+        # Provjera kako bi se izbjeglo dijeljenje s nulom (ako je točka točno u centru)
         if (u_left - self.cx) == 0 or (u_right - self.cx) == 0:
             return
 
@@ -76,12 +77,12 @@ class LaserKinematicsNodeSimulation(Node):
             return
 
         # Računanje kuta (yaw)
-        # Ako je lijevi Z veći od desnog, to znači da je lijevi dio zida dalje (robot je okrenut ulijevo)
+        # Ako je lijevi Z > desni Z, to znači da je robot je okrenut ulijevo
         dz = Z_right - Z_left
         yaw_rad = math.atan2(dz, self.B_METERS)
         yaw_deg = math.degrees(yaw_rad)
 
-        # Udaljenost do točke promatranja (po osi zračenja kamere)
+        # Udaljenost do točke promatranja (po osi kamere)
         Z_observed = (Z_left + Z_right) / 2.0
 
         # Stvarna, najkraća okomita udaljenost do ravnine zida
@@ -92,7 +93,7 @@ class LaserKinematicsNodeSimulation(Node):
         self.perp_dist_pub.publish(Float64(data=Z_perpendicular))
         self.yaw_pub.publish(Float64(data=yaw_deg))
 
-        # (Opcionalno) Ispis u terminal
+        # Ispis dobivenih vrijednosti u terminal
         self.get_logger().info(f"Obs Dist: {Z_observed:.3f}m | Perp Dist: {Z_perpendicular:.3f}m | Yaw: {yaw_deg:.2f}°")
 
 def main(args=None):
