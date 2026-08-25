@@ -82,7 +82,7 @@ class LaserPerceptionNodeSimulation(Node):
                 # Izdvajanje dijela slike sa svjetlinom (V kanal) samo za taj okvir
                 roi_v = v_channel[y:y+h, x:x+w]
                 
-                # Stvaranje lokalnu masku samo za tu konturu kako se ne bi zahvatio okolni šum
+                # Stvaranje lokalne maskue samo za tu konturu kako se ne bi zahvatio okolni šum
                 roi_mask = np.zeros((h, w), dtype=np.uint8)
                 shifted_contour = c - [x, y]
                 cv2.drawContours(roi_mask, [shifted_contour], -1, 255, -1)
