@@ -28,10 +28,8 @@ setup(
         'console_scripts': [
             'laser_perception_node = laser_triangulation.laser_perception_node:main',
             'laser_kinematics_node = laser_triangulation.laser_kinematics_node:main',
-            'laser_perception_node_simulation = laser_triangulation.laser_perception_node_simulation:main',
             'laser_kinematics_node_simulation = laser_triangulation.laser_kinematics_node_simulation:main',
             'laser_perception_node_centroid = laser_triangulation.laser_perception_node_centroid:main',
-            'laser_kinematics_node_centroid = laser_triangulation.laser_kinematics_node_centroid:main',
             'laser_perception_node_gauss = laser_triangulation.laser_perception_node_gauss:main'
         ],
     },
